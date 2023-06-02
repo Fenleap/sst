@@ -24,6 +24,9 @@ export interface ConfigOptions {
   profile?: string;
   role?: string;
   ssmPrefix?: string;
+  advanced?: {
+    disableParameterizedStackNameCheck?: boolean;
+  };
   bootstrap?: {
     stackName?: string;
     tags?: Record<string, string>;
@@ -84,18 +87,22 @@ interface GlobalOptions {
 }
 
 export async function initProject(globals: GlobalOptions) {
+  // Logger.debug("initing project");
   const root = globals.root || (await findRoot());
   const out = path.join(root, ".sst");
   await fs.mkdir(out, {
     recursive: true,
   });
+  // Logger.debug("made out dir");
 
   let file: string | undefined;
   const [metafile, sstConfig] = await (async function () {
     for (const ext of CONFIG_EXTENSIONS) {
       file = path.join(root, "sst" + ext);
       if (!fsSync.existsSync(file)) continue;
-      const [metafile, config] = await load(file);
+      // Logger.debug("found sst config");
+      const [metafile, config] = await load(file, true);
+      // Logger.debug("loaded sst config");
       return [metafile, config as SSTConfig];
     }
 
@@ -157,18 +164,25 @@ export async function initProject(globals: GlobalOptions) {
     },
   };
 
+  ProjectContext.provide(project);
+
   // Cleanup old config files
   (async function () {
     const files = await fs.readdir(project.paths.root);
     for (const file of files) {
       if (file.startsWith(".sst.config")) {
+        // Do not remove recently generated config files. This allows for multiple
+        // SST processes to run concurrently.
+        const timeGenerated = (file.match(/\b\d{13}\b/g) ?? []).at(0);
+        if (timeGenerated && Date.now() - parseInt(timeGenerated, 10) < 30000) {
+          continue;
+        }
         await fs.unlink(path.join(project.paths.root, file));
         Logger.debug(`Removed old config file ${file}`);
       }
     }
   })();
 
-  ProjectContext.provide(project);
   dotenv.config({
     path: path.join(project.paths.root, `.env.${project.config.stage}`),
     override: true,

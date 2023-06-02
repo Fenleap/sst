@@ -13,7 +13,7 @@ import {
   Duration as CdkDuration,
   RemovalPolicy,
   CustomResource,
-} from "aws-cdk-lib";
+} from "aws-cdk-lib/core";
 import {
   BlockPublicAccess,
   Bucket,
@@ -30,7 +30,6 @@ import {
   CompositePrincipal,
 } from "aws-cdk-lib/aws-iam";
 import {
-  Architecture,
   Function as CdkFunction,
   Code,
   Runtime,
@@ -48,6 +47,7 @@ import { Asset } from "aws-cdk-lib/aws-s3-assets";
 import {
   Distribution,
   ICachePolicy,
+  IResponseHeadersPolicy,
   BehaviorOptions,
   ViewerProtocolPolicy,
   AllowedMethods,
@@ -72,7 +72,7 @@ import { Stack } from "./Stack.js";
 import { Logger } from "../logger.js";
 import { createAppContext } from "./context.js";
 import { SSTConstruct, isCDKConstruct } from "./Construct.js";
-import { NodeJSProps, Function } from "./Function.js";
+import { NodeJSProps } from "./Function.js";
 import { Secret } from "./Secret.js";
 import { SsrFunction } from "./SsrFunction.js";
 import { EdgeFunction } from "./EdgeFunction.js";
@@ -237,6 +237,16 @@ export interface SsrSiteProps {
      * ```
      */
     deploy?: boolean;
+    /**
+     * The local site URL when running `sst dev`.
+     * @example
+     * ```js
+     * dev: {
+     *   url: "http://localhost:3000"
+     * }
+     * ```
+     */
+    url?: string;
   };
   /**
    * While deploying, SST waits for the CloudFront cache invalidation process to finish. This ensures that the new content will be served once the deploy command finishes. However, this process can sometimes take more than 5 mins. For non-prod environments it might make sense to pass in `false`. That'll skip waiting for the cache to invalidate and speed up the deploy process.
@@ -265,6 +275,11 @@ export interface SsrSiteProps {
      * is one that performs no caching of the server response.
      */
     serverCachePolicy?: ICachePolicy;
+    /**
+     * Override the CloudFront response headers policy properties for responses
+     * from the server rendering Lambda.
+     */
+    responseHeadersPolicy?: IResponseHeadersPolicy;
     server?: Pick<
       FunctionProps,
       | "vpc"
@@ -273,6 +288,7 @@ export interface SsrSiteProps {
       | "allowAllOutbound"
       | "allowPublicSubnet"
       | "architecture"
+      | "logRetention"
     >;
   };
 }
@@ -396,7 +412,7 @@ export class SsrSite extends Construct implements SSTConstruct {
    * The CloudFront URL of the website.
    */
   public get url() {
-    if (this.doNotDeploy) return;
+    if (this.doNotDeploy) return this.props.dev?.url;
 
     return `https://${this.distribution.distributionDomainName}`;
   }
@@ -438,8 +454,8 @@ export class SsrSite extends Construct implements SSTConstruct {
   /////////////////////
 
   /**
-   * Attaches the given list of permissions to allow the Astro server side
-   * rendering to access other AWS resources.
+   * Attaches the given list of permissions to allow the server side
+   * rendering framework to access other AWS resources.
    *
    * @example
    * ```js
@@ -493,9 +509,9 @@ export class SsrSite extends Construct implements SSTConstruct {
       variables: {
         url: this.doNotDeploy
           ? {
-            type: "plain",
-            value: "localhost",
-          }
+              type: "plain",
+              value: this.props.dev?.url ?? "localhost",
+            }
           : {
             // Do not set real value b/c we don't want to make the Lambda function
             // depend on the Site. B/c often the site depends on the Api, causing
@@ -583,7 +599,7 @@ export class SsrSite extends Construct implements SSTConstruct {
       });
     } catch (e) {
       throw new Error(
-        `There was a problem building the "${this.node.id}" StaticSite.`
+        `There was a problem building the "${this.node.id}" site.`
       );
     }
   }
@@ -692,17 +708,15 @@ export class SsrSite extends Construct implements SSTConstruct {
     if (cdk?.bucket && isCDKConstruct(cdk?.bucket)) {
       return cdk.bucket as Bucket;
     }
+
     // cdk.bucket is a prop
-    else {
-      const bucketProps = cdk?.bucket as BucketProps;
-      return new Bucket(this, "S3Bucket", {
-        publicReadAccess: false,
-        blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
-        autoDeleteObjects: true,
-        removalPolicy: RemovalPolicy.DESTROY,
-        ...bucketProps,
-      });
-    }
+    return new Bucket(this, "S3Bucket", {
+      publicReadAccess: false,
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      autoDeleteObjects: true,
+      removalPolicy: RemovalPolicy.DESTROY,
+      ...cdk?.bucket,
+    });
   }
 
   private createS3Deployment(
@@ -920,14 +934,18 @@ function handler(event) {
 
     return {
       viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      functionAssociations: this.buildBehaviorFunctionAssociations(),
       origin: new HttpOrigin(Fn.parseDomainName(fnUrl.url)),
       allowedMethods: AllowedMethods.ALLOW_ALL,
       cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
       compress: true,
       cachePolicy: cdk?.serverCachePolicy ?? this.buildServerCachePolicy(),
+      responseHeadersPolicy: cdk?.responseHeadersPolicy,
       originRequestPolicy: this.buildServerOriginRequestPolicy(),
       ...(cfDistributionProps.defaultBehavior || {}),
+      functionAssociations: [
+        ...this.buildBehaviorFunctionAssociations(),
+        ...(cfDistributionProps.defaultBehavior?.functionAssociations || []),
+      ],
     };
   }
 
@@ -937,14 +955,18 @@ function handler(event) {
 
     return {
       viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      functionAssociations: this.buildBehaviorFunctionAssociations(),
       origin,
       allowedMethods: AllowedMethods.ALLOW_ALL,
       cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
       compress: true,
       cachePolicy: cdk?.serverCachePolicy ?? this.buildServerCachePolicy(),
+      responseHeadersPolicy: cdk?.responseHeadersPolicy,
       originRequestPolicy: this.buildServerOriginRequestPolicy(),
       ...(cfDistributionProps.defaultBehavior || {}),
+      functionAssociations: [
+        ...this.buildBehaviorFunctionAssociations(),
+        ...(cfDistributionProps.defaultBehavior?.functionAssociations || []),
+      ],
       edgeLambdas: [
         {
           includeBody: true,
