@@ -110,10 +110,17 @@ export type SsrBuildConfig = {
   prerenderedBuildOutputDir?: string;
 };
 
-export interface SsrSiteNodeJSProps extends NodeJSProps {}
-export interface SsrDomainProps extends BaseSiteDomainProps {}
-export interface SsrSiteReplaceProps extends BaseSiteReplaceProps {}
-export interface SsrCdkDistributionProps extends BaseSiteCdkDistributionProps {}
+export interface SsrSiteNodeJSProps extends NodeJSProps { }
+export interface SsrDomainProps extends BaseSiteDomainProps { }
+export interface SsrSiteReplaceProps extends BaseSiteReplaceProps { }
+export interface SsrCdkDistributionProps extends BaseSiteCdkDistributionProps {
+  /**
+ * Additional Server behaviors for the distribution, mapped by the pathPattern that specifies which requests to apply the behavior to.
+ *
+ * @default - no additional Server behaviors are added.
+ */
+  additionalServerBehaviors?: Record<string, Omit<BehaviorOptions, "origin">>;
+}
 export interface SsrSiteProps {
   /**
    * Bind resources for the function
@@ -298,7 +305,7 @@ export class SsrSite extends Construct implements SSTConstruct {
   protected serverLambdaForRegional?: CdkFunction;
   private serverLambdaForDev?: CdkFunction;
   private bucket: Bucket;
-  private cfFunction: CfFunction;
+  private cfFunction?: CfFunction;
   private distribution: Distribution;
   private hostedZone?: IHostedZone;
   private certificate?: ICertificate;
@@ -366,7 +373,9 @@ export class SsrSite extends Construct implements SSTConstruct {
 
     // Create CloudFront
     this.validateCloudFrontDistributionSettings();
-    this.cfFunction = this.createCloudFrontFunction();
+    if (!!this.buildConfig.serverCFFunctionInjection) {
+      this.cfFunction = this.createCloudFrontFunction();
+    }
     this.distribution = this.props.edge
       ? this.createCloudFrontDistributionForEdge()
       : this.createCloudFrontDistributionForRegional();
@@ -484,22 +493,21 @@ export class SsrSite extends Construct implements SSTConstruct {
       variables: {
         url: this.doNotDeploy
           ? {
-              type: "plain",
-              value: "localhost",
-            }
+            type: "plain",
+            value: "localhost",
+          }
           : {
-              // Do not set real value b/c we don't want to make the Lambda function
-              // depend on the Site. B/c often the site depends on the Api, causing
-              // a CloudFormation circular dependency if the Api and the Site belong
-              // to different stacks.
-              type: "site_url",
-              value: this.customDomainUrl || this.url!,
-            },
+            // Do not set real value b/c we don't want to make the Lambda function
+            // depend on the Site. B/c often the site depends on the Api, causing
+            // a CloudFormation circular dependency if the Api and the Site belong
+            // to different stacks.
+            type: "site_url",
+            value: this.customDomainUrl || this.url!,
+          },
       },
       permissions: {
         "ssm:GetParameters": [
-          `arn:${Stack.of(this).partition}:ssm:${app.region}:${
-            app.account
+          `arn:${Stack.of(this).partition}:ssm:${app.region}:${app.account
           }:parameter${getParameterPath(this, "url")}`,
         ],
       },
@@ -599,8 +607,8 @@ export class SsrSite extends Construct implements SSTConstruct {
     const script = path.resolve(__dirname, "../support/base-site-archiver.mjs");
     const fileSizeLimit = app.isRunningSSTTest()
       ? // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore: "sstTestFileSizeLimitOverride" not exposed in props
-        this.props.sstTestFileSizeLimitOverride || 200
+      // @ts-ignore: "sstTestFileSizeLimitOverride" not exposed in props
+      this.props.sstTestFileSizeLimitOverride || 200
       : 200;
     const result = spawn.sync(
       "node",
@@ -610,11 +618,11 @@ export class SsrSite extends Construct implements SSTConstruct {
           path.join(this.props.path, this.buildConfig.clientBuildOutputDir),
           ...(this.buildConfig.prerenderedBuildOutputDir
             ? [
-                path.join(
-                  this.props.path,
-                  this.buildConfig.prerenderedBuildOutputDir
-                ),
-              ]
+              path.join(
+                this.props.path,
+                this.buildConfig.prerenderedBuildOutputDir
+              ),
+            ]
             : []),
         ].join(","),
         zipOutDir,
@@ -949,12 +957,12 @@ function handler(event) {
   }
 
   protected buildBehaviorFunctionAssociations() {
-    return [
+    return (!!this.cfFunction) ? [
       {
         eventType: CfFunctionEventType.VIEWER_REQUEST,
         function: this.cfFunction,
       },
-    ];
+    ] : [];
   }
 
   private buildStaticFileBehaviors(

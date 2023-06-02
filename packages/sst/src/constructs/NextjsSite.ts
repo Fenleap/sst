@@ -300,7 +300,13 @@ export class NextjsSite extends SsrSite {
         "_next/data/*": serverBehavior,
         "_next/image*": this.buildImageBehavior(cachePolicy),
         "_next/*": this.buildStaticFileBehavior(s3Origin),
-        ...(cfDistributionProps.additionalBehaviors || {}),
+        ...(this.buildAdditionalStaticBehaviorForEdge(s3Origin) || {}),
+        ...(this.buildAdditionalNextjsBehaviorForEdge(
+          functionVersion,
+          s3Origin,
+          cachePolicy,
+          originRequestPolicy
+        ) || {}),
       },
     });
   }
@@ -330,7 +336,7 @@ export class NextjsSite extends SsrSite {
   ): BehaviorOptions {
     return {
       viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      functionAssociations: this.buildBehaviorFunctionAssociations(),
+      // functionAssociations: this.buildBehaviorFunctionAssociations(),
       origin: s3Origin,
       allowedMethods: AllowedMethods.ALLOW_ALL,
       cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
@@ -421,14 +427,63 @@ export class NextjsSite extends SsrSite {
       originRequestPolicy,
       ...(cfDistributionProps.defaultBehavior || {}),
       edgeLambdas: [
-        {
+        ...(cfDistributionProps.defaultBehavior?.edgeLambdas || [{
           includeBody: true,
           eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
           functionVersion,
-        },
-        ...(cfDistributionProps.defaultBehavior?.edgeLambdas || []),
+        }]),
       ],
     };
+  }
+
+  private buildAdditionalStaticBehaviorForEdge(
+    s3Origin: S3Origin
+  ): Record<string, BehaviorOptions> {
+    const { cdk } = this.props;
+    const cfDistributionProps = cdk?.distribution || {};
+    const additionalBehaviors: Record<string, BehaviorOptions> = {};
+    if (cfDistributionProps.additionalBehaviors) {
+      for (const pathPattern in cfDistributionProps.additionalBehaviors) {
+        additionalBehaviors[pathPattern] = this.buildStaticFileBehavior(s3Origin)
+      }
+    }
+    return additionalBehaviors;
+  }
+
+  private buildAdditionalNextjsBehaviorForEdge(
+    functionVersion: IVersion,
+    s3Origin: S3Origin,
+    cachePolicy: ICachePolicy,
+    originRequestPolicy: IOriginRequestPolicy
+  ): Record<string, BehaviorOptions> {
+    const { cdk } = this.props;
+    const cfDistributionProps = cdk?.distribution || {};
+    const additionalServerBehaviors: Record<string, BehaviorOptions> = {};
+    if (cfDistributionProps.additionalServerBehaviors) {
+      for (const pathPattern in cfDistributionProps.additionalServerBehaviors) {
+        additionalServerBehaviors[pathPattern] = {
+          viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          // functionAssociations: this.buildBehaviorFunctionAssociations(),
+          origin: s3Origin,
+          allowedMethods: AllowedMethods.ALLOW_ALL,
+          cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
+          compress: true,
+          cachePolicy,
+          originRequestPolicy,
+          ...(cfDistributionProps.additionalServerBehaviors[pathPattern] || {}),
+          edgeLambdas: [
+            {
+              includeBody: true,
+              eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+              functionVersion,
+            },
+            ...(cfDistributionProps.additionalServerBehaviors[pathPattern]?.edgeLambdas || []),
+          ],
+        };
+      }
+    }
+
+    return additionalServerBehaviors;
   }
 
   protected generateBuildId(): string {
