@@ -286,7 +286,9 @@ export class Job extends Construct implements SSTConstruct {
   public getConstructMetadata() {
     return {
       type: "Job" as const,
-      data: {},
+      data: {
+        handler: this.props.handler,
+      },
     };
   }
 
@@ -444,6 +446,7 @@ export class Job extends Construct implements SSTConstruct {
           `console.log("//  End of the job  //")`,
           `console.log("//////////////////////")`,
           `console.log("")`,
+          `process.exit(0)`,
         ].join("\n")
       );
 

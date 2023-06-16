@@ -85,7 +85,7 @@ import {
 import { HttpsRedirect } from "./cdk/website-redirect.js";
 import { DnsValidatedCertificate } from "./cdk/dns-validated-certificate.js";
 import { Size } from "./util/size.js";
-import { Duration } from "./util/duration.js";
+import { Duration, toCdkDuration } from "./util/duration.js";
 import { Permissions, attachPermissionsToRole } from "./util/permission.js";
 import {
   FunctionBindingProps,
@@ -94,12 +94,6 @@ import {
 import { useProject } from "../project.js";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
-type SsrSiteType =
-  | "NextjsSite"
-  | "RemixSite"
-  | "AstroSite"
-  | "SolidStartSite"
-  | "SvelteKitSite";
 
 export type SsrBuildConfig = {
   typesPath: string;
@@ -312,12 +306,13 @@ type SsrSiteNormalizedProps = SsrSiteProps & {
  * });
  * ```
  */
-export class SsrSite extends Construct implements SSTConstruct {
+export abstract class SsrSite extends Construct implements SSTConstruct {
   public readonly id: string;
   protected props: SsrSiteNormalizedProps;
   private doNotDeploy: boolean;
   protected buildConfig: SsrBuildConfig;
-  protected serverLambdaForEdge?: EdgeFunction;
+  protected serverEdgeFunction?: EdgeFunction;
+  private serverLambdaForEdge?: CdkFunction;
   protected serverLambdaForRegional?: CdkFunction;
   private serverLambdaForDev?: CdkFunction;
   private bucket: Bucket;
@@ -345,9 +340,10 @@ export class SsrSite extends Construct implements SSTConstruct {
 
     this.buildConfig = this.initBuildConfig();
     this.validateSiteExists();
+    this.validateTimeout();
     this.writeTypesFile();
 
-    useSites().add(id, this.constructor.name as SsrSiteType, this.props);
+    useSites().add(id, this.constructor.name, this.props);
 
     if (this.doNotDeploy) {
       // @ts-ignore
@@ -366,7 +362,15 @@ export class SsrSite extends Construct implements SSTConstruct {
 
     // Create Server functions
     if (this.props.edge) {
-      this.serverLambdaForEdge = this.createFunctionForEdge();
+      this.serverEdgeFunction = this.createFunctionForEdge();
+      this.serverLambdaForEdge = CdkFunction.fromFunctionAttributes(
+        this,
+        "IEdgeFunction",
+        {
+          functionArn: this.serverEdgeFunction.functionArn,
+          role: this.serverEdgeFunction.role,
+        }
+      ) as CdkFunction;
       this.createFunctionPermissionsForEdge();
     } else {
       this.serverLambdaForRegional = this.createFunctionForRegional();
@@ -441,7 +445,7 @@ export class SsrSite extends Construct implements SSTConstruct {
     if (this.doNotDeploy) return;
 
     return {
-      function: this.serverLambdaForRegional,
+      function: this.serverLambdaForEdge || this.serverLambdaForRegional,
       bucket: this.bucket,
       distribution: this.distribution,
       hostedZone: this.hostedZone,
@@ -463,31 +467,23 @@ export class SsrSite extends Construct implements SSTConstruct {
    * ```
    */
   public attachPermissions(permissions: Permissions): void {
-    this.serverLambdaForEdge?.attachPermissions(permissions);
-    if (this.serverLambdaForDev) {
-      attachPermissionsToRole(
-        this.serverLambdaForDev.role as Role,
-        permissions
-      );
-    }
-    if (this.serverLambdaForRegional) {
-      attachPermissionsToRole(
-        this.serverLambdaForRegional.role as Role,
-        permissions
-      );
-    }
+    const server =
+      this.serverLambdaForEdge ||
+      this.serverLambdaForRegional ||
+      this.serverLambdaForDev;
+    attachPermissionsToRole(server?.role as Role, permissions);
   }
 
   /** @internal */
-  public getConstructMetadata() {
+  protected getConstructMetadataBase() {
     return {
-      type: this.constructor.name as SsrSiteType,
       data: {
         mode: this.doNotDeploy
           ? ("placeholder" as const)
           : ("deployed" as const),
         path: this.props.path,
         customDomainUrl: this.customDomainUrl,
+        url: this.url,
         edge: this.props.edge,
         server: (
           this.serverLambdaForDev ||
@@ -500,6 +496,10 @@ export class SsrSite extends Construct implements SSTConstruct {
       },
     };
   }
+
+  public abstract getConstructMetadata(): ReturnType<
+    SSTConstruct["getConstructMetadata"]
+  >;
 
   /** @internal */
   public getFunctionBinding(): FunctionBindingProps {
@@ -829,7 +829,7 @@ export class SsrSite extends Construct implements SSTConstruct {
   }
 
   private createFunctionPermissionsForEdge() {
-    this.bucket.grantReadWrite(this.serverLambdaForEdge!.role);
+    this.bucket.grantReadWrite(this.serverLambdaForEdge!.role!);
   }
 
   /////////////////////
@@ -925,7 +925,7 @@ function handler(event) {
   }
 
   protected buildDefaultBehaviorForRegional(): BehaviorOptions {
-    const { cdk } = this.props;
+    const { timeout, cdk } = this.props;
     const cfDistributionProps = cdk?.distribution || {};
 
     const fnUrl = this.serverLambdaForRegional!.addFunctionUrl({
@@ -934,7 +934,12 @@ function handler(event) {
 
     return {
       viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      origin: new HttpOrigin(Fn.parseDomainName(fnUrl.url)),
+      origin: new HttpOrigin(Fn.parseDomainName(fnUrl.url), {
+        readTimeout:
+          typeof timeout === "string"
+            ? toCdkDuration(timeout)
+            : CdkDuration.seconds(timeout),
+      }),
       allowedMethods: AllowedMethods.ALLOW_ALL,
       cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
       compress: true,
@@ -971,7 +976,7 @@ function handler(event) {
         {
           includeBody: true,
           eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
-          functionVersion: this.serverLambdaForEdge!.currentVersion,
+          functionVersion: this.serverEdgeFunction!.currentVersion,
         },
         ...(cfDistributionProps.defaultBehavior?.edgeLambdas || []),
       ],
@@ -1260,6 +1265,22 @@ function handler(event) {
     }
   }
 
+  private validateTimeout() {
+    const { edge, timeout } = this.props;
+    const num =
+      typeof timeout === "number"
+        ? timeout
+        : toCdkDuration(timeout).toSeconds();
+    const limit = edge ? 30 : 180;
+    if (num > limit) {
+      throw new Error(
+        edge
+          ? `Timeout must be less than or equal to 30 seconds when the "edge" flag is enabled.`
+          : `Timeout must be less than or equal to 180 seconds.`
+      );
+    }
+  }
+
   private writeTypesFile() {
     const typesPath = path.resolve(
       this.props.path,
@@ -1313,11 +1334,11 @@ function handler(event) {
 export const useSites = createAppContext(() => {
   const sites: {
     name: string;
-    type: SsrSiteType;
+    type: string;
     props: SsrSiteNormalizedProps;
   }[] = [];
   return {
-    add(name: string, type: SsrSiteType, props: SsrSiteNormalizedProps) {
+    add(name: string, type: string, props: SsrSiteNormalizedProps) {
       sites.push({ name, type, props });
     },
     get all() {

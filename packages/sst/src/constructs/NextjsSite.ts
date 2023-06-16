@@ -40,6 +40,8 @@ import { SsrFunction } from "./SsrFunction.js";
 import { EdgeFunction } from "./EdgeFunction.js";
 import { SsrSite, SsrSiteProps } from "./SsrSite.js";
 import { Size, toCdkSize } from "./util/size.js";
+import { toCdkDuration } from "./util/duration.js";
+import { SSTConstructMetadata } from "./Construct.js";
 
 export interface NextjsSiteProps extends Omit<SsrSiteProps, "nodejs"> {
   imageOptimization?: {
@@ -283,13 +285,18 @@ export class NextjsSite extends SsrSite {
      *    - x-vercel-cache: MISS
      */
 
-    const { cdk } = this.props;
+    const { timeout, cdk } = this.props;
     const cfDistributionProps = cdk?.distribution || {};
     const s3Origin = new S3Origin(this.cdk!.bucket);
     const serverFnUrl = this.serverLambdaForRegional!.addFunctionUrl({
       authType: FunctionUrlAuthType.NONE,
     });
-    const serverOrigin = new HttpOrigin(Fn.parseDomainName(serverFnUrl.url));
+    const serverOrigin = new HttpOrigin(Fn.parseDomainName(serverFnUrl.url), {
+      readTimeout:
+        typeof timeout === "string"
+          ? toCdkDuration(timeout)
+          : CdkDuration.seconds(timeout),
+    });
     const cachePolicy =
       cdk?.serverCachePolicy ??
       this.buildServerCachePolicy([
@@ -342,7 +349,7 @@ export class NextjsSite extends SsrSite {
         "next-router-state-tree",
       ]);
     const originRequestPolicy = this.buildServerOriginRequestPolicy();
-    const functionVersion = this.serverLambdaForEdge!.currentVersion;
+    const functionVersion = this.serverEdgeFunction!.currentVersion;
     const serverBehavior = this.buildServerBehaviorForEdge(
       functionVersion,
       s3Origin,
@@ -568,5 +575,12 @@ export class NextjsSite extends SsrSite {
   protected generateBuildId(): string {
     const filePath = path.join(this.props.path, ".next/BUILD_ID");
     return fs.readFileSync(filePath).toString();
+  }
+
+  public getConstructMetadata() {
+    return {
+      type: "NextjsSite" as const,
+      ...this.getConstructMetadataBase(),
+    };
   }
 }

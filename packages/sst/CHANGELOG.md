@@ -1,5 +1,103 @@
 # @serverless-stack/cli2
 
+## 2.13.6
+
+### Patch Changes
+
+- [`468f35520`](https://github.com/serverless-stack/sst/commit/468f355204b17f740bc0c92abb926a9be33e2aea) Thanks [@thdxr](https://github.com/thdxr)! - auth: code adapter handles invalid
+
+## 2.13.5
+
+### Patch Changes
+
+- [`a05a1359d`](https://github.com/serverless-stack/sst/commit/a05a1359db965e555d639bda18a607f2a7924c41) Thanks [@thdxr](https://github.com/thdxr)! - StaticSite: include url in metadata
+
+## 2.13.4
+
+### Patch Changes
+
+- [`4f196437a`](https://github.com/serverless-stack/sst/commit/4f196437a2b123174b812f48c8f2e5ea46fbaae9) Thanks [@thdxr](https://github.com/thdxr)! - site: include url in site metadata
+
+## 2.13.3
+
+### Patch Changes
+
+- [`d8970b0fa`](https://github.com/serverless-stack/sst/commit/d8970b0fa36d6ab461b22af0ecd8d3bddcf3cdf4) Thanks [@fwang](https://github.com/fwang)! - Fix stack synthesizer not respect "cdk" props in sst.config
+
+- [`79f678179`](https://github.com/serverless-stack/sst/commit/79f678179761a455ac463e36f630beaabd13e19e) Thanks [@thdxr](https://github.com/thdxr)! - auth: encryption utilities + code adapter
+
+- [`4d9c70f3b`](https://github.com/serverless-stack/sst/commit/4d9c70f3b874fcf55de5ff9b0eade44e2f48fddf) Thanks [@thdxr](https://github.com/thdxr)! - constructs: metadata updates and fixes
+
+- [`1c8a7a39c`](https://github.com/serverless-stack/sst/commit/1c8a7a39c97206e5c90cbac93858c5bf7b2bf6a6) Thanks [@fwang](https://github.com/fwang)! - Script: do not run script on rollback
+
+## 2.13.2
+
+### Patch Changes
+
+- [`80bb4f089`](https://github.com/serverless-stack/sst/commit/80bb4f089d0c071ae072be595e531229eaaa04f2) Thanks [@fwang](https://github.com/fwang)! - SsrSite: CloudFront origin timeout respect server lambda timeout
+
+- [`67ee41566`](https://github.com/serverless-stack/sst/commit/67ee4156662325121f4afeaf42dce07ba6ba28c3) Thanks [@fwang](https://github.com/fwang)! - SsrSite: expose cdk.function for edge mode
+
+- [`6dd69d9c7`](https://github.com/serverless-stack/sst/commit/6dd69d9c74a6941dc64fd1c21fd2064f0869eeb9) Thanks [@thdxr](https://github.com/thdxr)! - auth: allow customizing index page
+
+## 2.13.1
+
+### Patch Changes
+
+- [`e77262351`](https://github.com/serverless-stack/sst/commit/e77262351f15fb31073d6b729345f4263bf678b8) Thanks [@thdxr](https://github.com/thdxr)! - eventbus: handle subscriber name too long
+
+## 2.13.0
+
+### Minor Changes
+
+- [#2965](https://github.com/serverless-stack/sst/pull/2965) [`83909ce36`](https://github.com/serverless-stack/sst/commit/83909ce367e6e247a9b25063624ecbbd13bc1260) Thanks [@michaelgmcd](https://github.com/michaelgmcd)! - Support Postgres 13.9
+
+### Patch Changes
+
+- [`4a5eb23e1`](https://github.com/serverless-stack/sst/commit/4a5eb23e117366672a10c4cb88458b914e713d12) Thanks [@thdxr](https://github.com/thdxr)! - remove sigterm trapping
+
+- [`bec587f0b`](https://github.com/serverless-stack/sst/commit/bec587f0bddb766248095414ee116f79e4d14ba2) Thanks [@thdxr](https://github.com/thdxr)! - eventbus: support subscribing to multiple events
+
+## 2.12.2
+
+### Patch Changes
+
+- [`b5d360c68`](https://github.com/serverless-stack/sst/commit/b5d360c68bbc14357d67387672477465970ac3a3) Thanks [@thdxr](https://github.com/thdxr)! - eventbus: support multiple events in subscription
+
+## 2.12.1
+
+## 2.12.0
+
+### Minor Changes
+
+- [`5fa74500d`](https://github.com/serverless-stack/sst/commit/5fa74500d0ae32587372f95510bd7eb1ed31a3e2) Thanks [@thdxr](https://github.com/thdxr)! - Breaking change in future/auth:
+
+  Instead of returning the session directly from `onSuccess` there is now a second paramter passed in called `response`. You can use this to create sessions `return response.session` but can also instead chain other providers or return a normal HTTP response. This comes in handy when creating multi-step auth processes or when connecting external services to an existing account.
+
+## 2.11.18
+
+### Patch Changes
+
+- [#2956](https://github.com/serverless-stack/sst/pull/2956) [`e23457d25`](https://github.com/serverless-stack/sst/commit/e23457d25d867329da93a50bd35d0a6cd1ff805e) Thanks [@fwang](https://github.com/fwang)! - Allow overriding CDK roles in sst.config.ts
+
+## 2.11.17
+
+### Patch Changes
+
+- [`e74f8a350`](https://github.com/serverless-stack/sst/commit/e74f8a350b6439e50be715d53a6e223489f474e1) Thanks [@fwang](https://github.com/fwang)! - Job: exit process in the wrapper function
+
+## 2.11.16
+
+### Patch Changes
+
+- [`14c6bad3b`](https://github.com/serverless-stack/sst/commit/14c6bad3baa60d0a5c79745ce64514d8477d53bd) Thanks [@fwang](https://github.com/fwang)! - RemixSite: host header shows CloudFront domain
+
+## 2.11.15
+
+### Patch Changes
+
+- [`6645002d0`](https://github.com/serverless-stack/sst/commit/6645002d00be8085a4090ccbd86d3b1b1849c3d8) Thanks [@thdxr](https://github.com/thdxr)! - rds: add support for 11.16 postgres
+
 ## 2.11.14
 
 ### Patch Changes
