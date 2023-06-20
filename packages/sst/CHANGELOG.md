@@ -1,5 +1,35 @@
 # @serverless-stack/cli2
 
+## 2.15.0
+
+### Minor Changes
+
+- [`1fe0692cd`](https://github.com/serverless-stack/sst/commit/1fe0692cde01e0fda1bca1574f3e37d99512b6bf) Thanks [@thdxr](https://github.com/thdxr)! - future auth: code adapter callback api changed to onCodeRequest and onCodeInvalid
+
+## 2.14.0
+
+### Minor Changes
+
+- [#2764](https://github.com/serverless-stack/sst/pull/2764) [`0c73f55ea`](https://github.com/serverless-stack/sst/commit/0c73f55eab16d5ec1694c6bc0a34b1e9873f6fcb) Thanks [@conico974](https://github.com/conico974)! - NextjsSite: Improved ISR support
+
+## 2.13.9
+
+### Patch Changes
+
+- [`bd83933d6`](https://github.com/serverless-stack/sst/commit/bd83933d697dc21209ed2fbfa86e08484c61d2c5) Thanks [@thdxr](https://github.com/thdxr)! - metadata: include script, job and auth metadata
+
+## 2.13.8
+
+### Patch Changes
+
+- [`4b2a95621`](https://github.com/serverless-stack/sst/commit/4b2a95621b86b06e49668ad79b9912c5640b4f97) Thanks [@thdxr](https://github.com/thdxr)! - context: reset should reset itself as well
+
+## 2.13.7
+
+### Patch Changes
+
+- [`7b1956784`](https://github.com/serverless-stack/sst/commit/7b1956784cf89ab72e4f13c0b4effce31c70166f) Thanks [@thdxr](https://github.com/thdxr)! - allow context to be reset
+
 ## 2.13.6
 
 ### Patch Changes
