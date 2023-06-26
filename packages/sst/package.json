@@ -4,7 +4,7 @@
     "access": "public"
   },
   "sideEffects": false,
-  "name": "@fenleap/sst",
+  "name": "sst",
   "version": "2.16.2",
   "bin": {
     "sst": "cli/sst.js"
