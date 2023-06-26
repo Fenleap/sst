@@ -1,5 +1,33 @@
 # @serverless-stack/cli2
 
+## 2.16.2
+
+### Patch Changes
+
+- [#3003](https://github.com/serverless-stack/sst/pull/3003) [`d970a4bbe`](https://github.com/serverless-stack/sst/commit/d970a4bbe6731321d36df96e9e26d1edcf7d7443) Thanks [@clawsl](https://github.com/clawsl)! - arm64 docker build support for Python functions
+
+- [`56b237da1`](https://github.com/serverless-stack/sst/commit/56b237da140ae49d54da97f27fd42978a7110944) Thanks [@fwang](https://github.com/fwang)! - StaticSite: allow setting content type
+
+- [#2998](https://github.com/serverless-stack/sst/pull/2998) [`62ff43063`](https://github.com/serverless-stack/sst/commit/62ff43063c91fdae0a736dc56db06250451bee75) Thanks [@berenddeboer](https://github.com/berenddeboer)! - add --to option to diff to prevent it building to .sst/dist
+
+- [`75a77c6e5`](https://github.com/serverless-stack/sst/commit/75a77c6e53a8c81e9cc4ca960ef6ca92a425985e) Thanks [@fwang](https://github.com/fwang)! - StaticSite: preserver .well-known uri path
+
+## 2.16.1
+
+### Patch Changes
+
+- [`a96dd29b2`](https://github.com/serverless-stack/sst/commit/a96dd29b27a3667027400db061c3144619179675) Thanks [@fwang](https://github.com/fwang)! - Script: run once on "sst dev" boot up
+
+## 2.16.0
+
+### Minor Changes
+
+- [#3001](https://github.com/serverless-stack/sst/pull/3001) [`53fd3cb75`](https://github.com/serverless-stack/sst/commit/53fd3cb757baefc4af9129e8cd4183492d23fae4) Thanks [@fwang](https://github.com/fwang)! - Update CDK to v2.84.0
+
+### Patch Changes
+
+- [#3000](https://github.com/serverless-stack/sst/pull/3000) [`aa36e945e`](https://github.com/serverless-stack/sst/commit/aa36e945eed53bd11eb908100d62b42c305f53e3) Thanks [@iloewensen](https://github.com/iloewensen)! - RDS: grant cloudformation DescribeStacks permission
+
 ## 2.15.0
 
 ### Minor Changes
